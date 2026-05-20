@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Jungle JobNimble – Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap');
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:     #0D0F10;
+      --panel:  #161A1D;
+      --border: #252B2F;
+      --accent: #F4600C;
+      --text:   #E8EAE9;
+      --muted:  #6B7477;
+      --green:  #22C55E;
+      --yellow: #EAB308;
+      --red:    #EF4444;
+    }
+
+    html, body { height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Barlow', sans-serif;
+      display: flex; flex-direction: column;
+      height: 100vh; overflow: hidden;
+      transition: background 0.3s;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 0 18px; height: 52px;
+      display: flex; align-items: center;
+      justify-content: space-between; gap: 14px;
+      flex-shrink: 0; z-index: 1000;
+    }
+    .logo {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 1.05rem; letter-spacing: 0.1em;
+      color: var(--accent); text-transform: uppercase; white-space: nowrap;
+    }
+
+    /* search */
+    .search-wrap { flex: 1; max-width: 260px; position: relative; }
+    .search-wrap input {
+      width: 100%;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text);
+      font-family: 'Barlow', sans-serif; font-size: 0.85rem;
+      padding: 7px 12px 7px 30px; outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-wrap input:focus { border-color: var(--accent); }
+    .search-wrap input::placeholder { color: var(--muted); }
+    .search-icon {
+      position: absolute; left: 9px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted); font-size: 0.8rem; pointer-events: none;
+    }
+
+    .header-right { display: flex; gap: 8px; align-items: center; }
+    .live-badge {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 0.68rem; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--muted);
+    }
+    .dot-live {
+      width: 7px; height: 7px;
+      background: var(--green); border-radius: 50%;
+      animation: blink 1.6s ease-in-out infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+    .icon-btn {
+      width: 34px; height: 34px; border-radius: 8px;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--muted); font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .icon-btn:hover { background: var(--border); color: var(--text); }
+
+    /* ── Layout ── */
+    .main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 264px; background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow: hidden; flex-shrink: 0;
+    }
+
+    .stat-bar {
+      display: flex; padding: 12px 16px;
+      border-bottom: 1px solid var(--border); gap: 0;
+    }
+    .stat {
+      flex: 1; text-align: center;
+      border-right: 1px solid var(--border);
+    }
+    .stat:last-child { border-right: none; }
+    .stat-num {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 1.5rem; color: var(--accent); line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.63rem; text-transform: uppercase;
+      letter-spacing: 0.09em; color: var(--muted); margin-top: 2px;
+    }
+
+    #workerList { flex: 1; overflow-y: auto; }
+    #workerList::-webkit-scrollbar { width: 3px; }
+    #workerList::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .worker-card {
+      padding: 11px 16px; border-bottom: 1px solid var(--border);
+      cursor: pointer; transition: background 0.12s;
+      border-left: 3px solid transparent;
+    }
+    .worker-card:hover { background: rgba(255,255,255,0.025); }
+    .worker-card.selected { background: rgba(244,96,12,0.07); border-left-color: var(--accent); }
+
+    .card-top {
+      display: flex; align-items: center; gap: 9px; margin-bottom: 4px;
+    }
+    .avatar {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 0.82rem; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .card-name { font-weight: 600; font-size: 0.88rem; flex: 1; }
+
+    .badge {
+      font-size: 0.62rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      padding: 2px 7px; border-radius: 10px;
+    }
+    .badge-active  { background: rgba(34,197,94,0.14);   color: var(--green); }
+    .badge-lunch   { background: rgba(234,179,8,0.14);   color: var(--yellow); }
+    .badge-offline { background: rgba(107,116,119,0.12); color: var(--muted); }
+
+    .card-meta {
+      font-size: 0.7rem; color: var(--muted); padding-left: 37px;
+    }
+
+    .empty-state {
+      padding: 36px 18px; text-align: center;
+      color: var(--muted); font-size: 0.8rem; line-height: 1.8;
+    }
+
+    /* ── Map ── */
+    #map { flex: 1; z-index: 1; }
+
+    /* ── Leaflet popup ── */
+    .leaflet-popup-content-wrapper {
+      background: var(--panel) !important;
+      color: var(--text) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.55) !important;
+      font-family: 'Barlow', sans-serif !important;
+    }
+    .leaflet-popup-tip { background: var(--panel) !important; }
+    .leaflet-popup-content { margin: 13px 15px !important; min-width: 185px !important; }
+    .popup-name {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 1rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;
+    }
+    .popup-row { font-size: 0.74rem; color: #8A9498; margin-bottom: 3px; }
+    .popup-row span { color: var(--text); }
+
+    /* ── Settings panel ── */
+    .settings-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 500;
+    }
+    .settings-overlay.open { display: block; }
+    .settings-panel {
+      position: fixed; top: 0; right: -310px; width: 290px;
+      height: 100vh; background: var(--panel);
+      border-left: 1px solid var(--border);
+      z-index: 501; padding: 22px 18px;
+      transition: right 0.28s ease; overflow-y: auto;
+    }
+    .settings-panel.open { right: 0; }
+    .settings-panel h3 {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--muted); margin-bottom: 16px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .close-btn { background: none; border: none; color: var(--muted); font-size: 1.1rem; cursor: pointer; }
+    .theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+    .theme-chip {
+      border-radius: 10px; padding: 11px; cursor: pointer;
+      border: 2px solid transparent; transition: border-color 0.2s; text-align: center;
+      background: var(--bg);
+    }
+    .theme-chip.selected { border-color: var(--accent); }
+    .theme-swatch { width: 100%; height: 26px; border-radius: 6px; margin-bottom: 5px; }
+    .theme-name { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🌿 Jungle JobNimble</div>
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="searchInput" placeholder="Search service members…" oninput="renderSidebar()"/>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><div class="dot-live"></div>Live</div>
+    <button class="icon-btn" id="mapBtn" onclick="toggleMap()" title="Day/Night Map">🌙</button>
+    <button class="icon-btn" onclick="openSettings()" title="Settings">⚙️</button>
+  </div>
+</header>
+
+<div class="main">
+  <aside class="sidebar">
+    <div class="stat-bar">
+      <div class="stat"><div class="stat-num" id="cntActive">0</div><div class="stat-label">Active</div></div>
+      <div class="stat"><div class="stat-num" id="cntLunch">0</div><div class="stat-label">Lunch</div></div>
+      <div class="stat"><div class="stat-num" id="cntTotal">0</div><div class="stat-label">Total</div></div>
+    </div>
+    <div id="workerList"></div>
+  </aside>
+  <div id="map"></div>
+</div>
+
+<div class="settings-overlay" id="overlay" onclick="closeSettings()"></div>
+<div class="settings-panel" id="settingsPanel">
+  <h3>Appearance <button class="close-btn" onclick="closeSettings()">✕</button></h3>
+  <div class="theme-grid" id="themeGrid"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyD9VGtbHX0lSOBIaUVkL9D8kHyu3BaKmAs",
+  authDomain:"jobnimbletracker.firebaseapp.com",
+  databaseURL:"https://jobnimbletracker-default-rtdb.firebaseio.com",
+  projectId:"jobnimbletracker",
+  storageBucket:"jobnimbletracker.firebasestorage.app",
+  messagingSenderId:"16767088702",
+  appId:"1:16767088702:web:81661224bb1a89df0f796f"
+});
+const db = firebase.database();
+
+// ── Themes ────────────────────────────────────────────────────────────
+const THEMES = {
+  midnight:{ name:'Midnight', bg:'#0D0F10', panel:'#161A1D', border:'#252B2F', accent:'#F4600C', text:'#E8EAE9', muted:'#6B7477', sw:'linear-gradient(135deg,#0D0F10 40%,#F4600C)' },
+  forest:  { name:'Forest',   bg:'#0A1210', panel:'#111A16', border:'#1E2E26', accent:'#22C55E', text:'#E2EDE8', muted:'#5E7A6A', sw:'linear-gradient(135deg,#0A1210 40%,#22C55E)' },
+  navy:    { name:'Navy',     bg:'#080E1A', panel:'#0E1729', border:'#1A2540', accent:'#38BDF8', text:'#E0EEFF', muted:'#4A6080', sw:'linear-gradient(135deg,#080E1A 40%,#38BDF8)' },
+  slate:   { name:'Slate',    bg:'#0F1117', panel:'#171B24', border:'#252A38', accent:'#818CF8', text:'#E4E5F0', muted:'#5C6280', sw:'linear-gradient(135deg,#0F1117 40%,#818CF8)' },
+  desert:  { name:'Desert',   bg:'#12100A', panel:'#1A1710', border:'#2E2A1E', accent:'#F59E0B', text:'#EDE9E0', muted:'#736B55', sw:'linear-gradient(135deg,#12100A 40%,#F59E0B)' },
+};
+
+function applyTheme(key) {
+  const t = THEMES[key]; if (!t) return;
+  const s = document.documentElement.style;
+  s.setProperty('--bg',     t.bg);
+  s.setProperty('--panel',  t.panel);
+  s.setProperty('--border', t.border);
+  s.setProperty('--accent', t.accent);
+  s.setProperty('--text',   t.text);
+  s.setProperty('--muted',  t.muted);
+  localStorage.setItem('jjn-d-theme', key);
+  buildThemeGrid(key);
+}
+
+function buildThemeGrid(sel) {
+  document.getElementById('themeGrid').innerHTML = Object.entries(THEMES).map(([k,t])=>`
+    <div class="theme-chip ${sel===k?'selected':''}" onclick="applyTheme('${k}')">
+      <div class="theme-swatch" style="background:${t.sw}"></div>
+      <div class="theme-name">${t.name}</div>
+    </div>`).join('');
+}
+
+// ── Settings ──────────────────────────────────────────────────────────
+function openSettings()  { document.getElementById('settingsPanel').classList.add('open'); document.getElementById('overlay').classList.add('open'); }
+function closeSettings() { document.getElementById('settingsPanel').classList.remove('open'); document.getElementById('overlay').classList.remove('open'); }
+
+// ── Map ───────────────────────────────────────────────────────────────
+const TILES = {
+  dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+};
+const map = L.map('map').setView([27.8, -81.7], 7);
+let isDay = localStorage.getItem('jjn-d-day') === 'true';
+let tileLayer = L.tileLayer(isDay ? TILES.light : TILES.dark, { attribution:'© OpenStreetMap © CARTO', maxZoom:19 }).addTo(map);
+
+function toggleMap() {
+  isDay = !isDay;
+  map.removeLayer(tileLayer);
+  tileLayer = L.tileLayer(isDay ? TILES.light : TILES.dark, { attribution:'© OpenStreetMap © CARTO', maxZoom:19 }).addTo(map);
+  document.getElementById('mapBtn').textContent = isDay ? '☀️' : '🌙';
+  localStorage.setItem('jjn-d-day', isDay);
+}
+if (isDay) document.getElementById('mapBtn').textContent = '☀️';
+
+// ── Workers ───────────────────────────────────────────────────────────
+const workers = {}, markers = {};
+const COLORS = ['#F4600C','#3B82F6','#22C55E','#A855F7','#EAB308','#EC4899','#14B8A6','#F97316'];
+const wColors = {};
+let colorIdx = 0;
+
+function getColor(n) { if (!wColors[n]) wColors[n] = COLORS[colorIdx++ % COLORS.length]; return wColors[n]; }
+function initials(n) { return n.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2); }
+function fmtTime(iso) { return iso ? new Date(iso).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—'; }
+
+function makeIcon(name, d) {
+  const color = getColor(name);
+  const dim   = d.status === 'clocked_out' ? '0.38' : '1';
+  const ring  = d.status === 'on_lunch' ? '#EAB308' : d.status === 'clocked_in' ? '#22C55E' : '#444';
+  const label = d.status === 'on_lunch' ? '🍽' : initials(name);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="42" height="52" viewBox="0 0 42 52">
+    <filter id="sh${name.replace(/\s/,'')}"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000" flood-opacity="0.5"/></filter>
+    <path d="M21 2C11.6 2 4 9.6 4 19c0 12.5 17 31 17 31S38 31.5 38 19C38 9.6 30.4 2 21 2z"
+      fill="${color}" opacity="${dim}" filter="url(#sh${name.replace(/\s/,'')})"/>
+    <circle cx="21" cy="19" r="11" fill="none" stroke="${ring}" stroke-width="2.5" opacity="${dim}"/>
+    <text x="21" y="24" text-anchor="middle" font-family="Barlow Condensed,sans-serif"
+      font-size="${d.status==='on_lunch'?'10':'11'}" font-weight="700" fill="#fff" opacity="${dim}">${label}</text>
+  </svg>`;
+  return L.divIcon({ html:svg, className:'', iconSize:[42,52], iconAnchor:[21,52], popupAnchor:[0,-54] });
+}
+
+function popupHTML(name, d) {
+  const color  = getColor(name);
+  const status = d.status==='clocked_in' ? '🟢 Active' : d.status==='on_lunch' ? '🟡 On Lunch' : '⚫ Off Duty';
+  return `
+    <div class="popup-name" style="color:${color}">${name}</div>
+    <div class="popup-row">Status: <span>${status}</span></div>
+    <div class="popup-row">Last update: <span>${fmtTime(d.timestamp)}</span></div>
+    <div class="popup-row">GPS accuracy: <span>${d.accuracy ? d.accuracy+'m' : '—'}</span></div>
+    <div class="popup-row">Lat / Lng: <span>${(+d.lat).toFixed(5)}, ${(+d.lng).toFixed(5)}</span></div>`;
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────────
+function renderSidebar() {
+  const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+  const all   = Object.keys(workers);
+  const shown = q ? all.filter(n => n.toLowerCase().includes(q)) : all;
+
+  document.getElementById('cntActive').textContent = all.filter(n=>workers[n].status==='clocked_in').length;
+  document.getElementById('cntLunch').textContent  = all.filter(n=>workers[n].status==='on_lunch').length;
+  document.getElementById('cntTotal').textContent  = all.length;
+
+  const list = document.getElementById('workerList');
+  if (!shown.length) {
+    list.innerHTML = `<div class="empty-state">${q ? `No results for "<b>${q}</b>"` : 'No service members online yet.'}</div>`;
+    return;
+  }
+
+  const order = { clocked_in:0, on_lunch:1, clocked_out:2 };
+  shown.sort((a,b) => (order[workers[a].status]||2) - (order[workers[b].status]||2));
+
+  list.innerHTML = shown.map(name => {
+    const d = workers[name];
+    const color = getColor(name);
+    const [bc, bt] =
+      d.status==='clocked_in'  ? ['badge-active',  'Active']   :
+      d.status==='on_lunch'    ? ['badge-lunch',   'On Lunch'] :
+                                 ['badge-offline',  'Off Duty'];
+    return `
+      <div class="worker-card" onclick="focusWorker('${name}')" id="card-${CSS.escape(name)}">
+        <div class="card-top">
+          <div class="avatar" style="background:${color}">${initials(name)}</div>
+          <div class="card-name">${name}</div>
+          <div class="badge ${bc}">${bt}</div>
+        </div>
+        <div class="card-meta">Updated ${fmtTime(d.timestamp)}</div>
+      </div>`;
+  }).join('');
+}
+
+function focusWorker(name) {
+  const d = workers[name]; if (!d) return;
+  map.setView([d.lat, d.lng], 15, { animate:true });
+  if (markers[name]) markers[name].openPopup();
+  document.querySelectorAll('.worker-card').forEach(c=>c.classList.remove('selected'));
+  const card = document.getElementById('card-'+CSS.escape(name));
+  if (card) card.classList.add('selected');
+}
+
+// ── Firebase listener ─────────────────────────────────────────────────
+db.ref('workers').on('value', snap => {
+  const data = snap.val() || {};
+
+  Object.keys(markers).forEach(name => {
+    if (!data[name]) { map.removeLayer(markers[name]); delete markers[name]; delete workers[name]; }
+  });
+
+  Object.entries(data).forEach(([name, d]) => {
+    if (!d.lat || !d.lng) return;
+    workers[name] = d;
+    const ll = [+d.lat, +d.lng];
+    if (markers[name]) {
+      markers[name].setLatLng(ll).setIcon(makeIcon(name, d)).setPopupContent(popupHTML(name, d));
+    } else {
+      markers[name] = L.marker(ll, { icon:makeIcon(name, d) }).addTo(map).bindPopup(popupHTML(name, d));
+    }
+  });
+
+  renderSidebar();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────
+applyTheme(localStorage.getItem('jjn-d-theme') || 'midnight');
+</script>
+</body>
+</html>
